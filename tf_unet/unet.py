@@ -185,7 +185,7 @@ class Unet(object):
     :param cost_kwargs: (optional) kwargs passed to the cost function. See Unet._get_cost for more options
     """
 
-    def __init__(self, channels=3, n_class=2, cost="cross_entropy", cost_kwargs={}, **kwargs):
+    def __init__(self, channels=3, n_class=2, keep_prob=1.0, cost="cross_entropy", cost_kwargs={}, **kwargs):
         tf.reset_default_graph()
 
         self.n_class = n_class
@@ -193,7 +193,7 @@ class Unet(object):
 
         self.x = tf.placeholder("float", shape=[None, None, None, channels], name="x")
         self.y = tf.placeholder("float", shape=[None, None, None, n_class], name="y")
-        self.keep_prob = tf.placeholder(tf.float32, name="dropout_probability")  # dropout (keep probability)
+        self.keep_prob = keep_prob  # dropout (keep probability)
 
         logits, self.variables, self.offset = create_conv_net(self.x, self.keep_prob, channels, n_class, **kwargs)
 
@@ -274,7 +274,7 @@ class Unet(object):
             self.restore(sess, model_path)
 
             y_dummy = np.empty((x_test.shape[0], x_test.shape[1], x_test.shape[2], self.n_class))
-            prediction = sess.run(self.predicter, feed_dict={self.x: x_test, self.y: y_dummy, self.keep_prob: 1.})
+            prediction = sess.run(self.predicter, feed_dict={self.x: x_test, self.y: y_dummy})
 
         return prediction
 
@@ -387,7 +387,7 @@ class Trainer(object):
 
         return init
 
-    def train(self, data_provider, output_path, training_iters=10, epochs=100, dropout=0.75, display_step=1,
+    def train(self, data_provider, output_path, training_iters=10, epochs=100, display_step=1,
               restore=False, write_graph=False, prediction_path='prediction'):
         """
         Lauches the training process
@@ -435,8 +435,7 @@ class Trainer(object):
                     _, loss, lr, gradients = sess.run(
                         (self.optimizer, self.net.cost, self.learning_rate_node, self.net.gradients_node),
                         feed_dict={self.net.x: batch_x,
-                                   self.net.y: util.crop_to_shape(batch_y, pred_shape),
-                                   self.net.keep_prob: dropout})
+                                   self.net.y: util.crop_to_shape(batch_y, pred_shape)})
 
                     if self.net.summaries and self.norm_grads:
                         avg_gradients = _update_avg_gradients(avg_gradients, gradients, step)
@@ -459,13 +458,11 @@ class Trainer(object):
 
     def store_prediction(self, sess, batch_x, batch_y, name):
         prediction = sess.run(self.net.predicter, feed_dict={self.net.x: batch_x,
-                                                             self.net.y: batch_y,
-                                                             self.net.keep_prob: 1.})
+                                                             self.net.y: batch_y})
         pred_shape = prediction.shape
 
         loss = sess.run(self.net.cost, feed_dict={self.net.x: batch_x,
-                                                  self.net.y: util.crop_to_shape(batch_y, pred_shape),
-                                                  self.net.keep_prob: 1.})
+                                                  self.net.y: util.crop_to_shape(batch_y, pred_shape)})
 
         logging.info("Verification error= {:.1f}%, loss= {:.4f}".format(error_rate(prediction,
                                                                                    util.crop_to_shape(batch_y,
@@ -488,8 +485,7 @@ class Trainer(object):
                                                         self.net.accuracy,
                                                         self.net.predicter],
                                                        feed_dict={self.net.x: batch_x,
-                                                                  self.net.y: batch_y,
-                                                                  self.net.keep_prob: 1.})
+                                                                  self.net.y: batch_y})
         summary_writer.add_summary(summary_str, step)
         summary_writer.flush()
         logging.info(
