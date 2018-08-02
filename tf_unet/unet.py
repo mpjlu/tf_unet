@@ -388,7 +388,7 @@ class Trainer(object):
         return init
 
     def train(self, data_provider, output_path, training_iters=10, epochs=100, display_step=1,
-              restore=False, write_graph=False, prediction_path='prediction'):
+              restore=False, write_graph=False, prediction_path='prediction', inter=1, intra=56):
         """
         Lauches the training process
 
@@ -401,6 +401,8 @@ class Trainer(object):
         :param restore: Flag if previous model should be restored
         :param write_graph: Flag if the computation graph should be written as protobuf file to the output path
         :param prediction_path: path where to save predictions on each epoch
+        :param inter: number of inter threads for train
+        :param intra: number of intra threads for train
         """
         save_path = os.path.join(output_path, "model.ckpt")
         if epochs == 0:
@@ -408,7 +410,8 @@ class Trainer(object):
 
         init = self._initialize(training_iters, output_path, restore, prediction_path)
 
-        with tf.Session() as sess:
+        config = tf.ConfigProto(intra_op_parallelism_threads=intra,inter_op_parallelism_threads=inter)
+        with tf.Session(config=config) as sess:
             if write_graph:
                 tf.train.write_graph(sess.graph_def, output_path, "graph.pb", False)
 
